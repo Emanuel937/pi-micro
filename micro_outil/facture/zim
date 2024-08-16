@@ -1,0 +1,68 @@
+  #!/bin/bash
+
+if [ "$#" -eq 0 ]; then
+echo "Aucun argument n'a été passé."
+exit 1
+fi
+
+FIND_FILE_NAME=0
+FILE_STAT=0
+CMD_PID=0
+
+function findFileAndStat(){
+    # Boucler sur tous les arguments
+    for arg in "$@"; 
+      do
+        # Vérifier si l'argument est un fichier existant
+        if [ -f "./$arg" ]; 
+            then
+                FIND_FILE_NAME=$arg
+                FILE_STAT=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$FIND_FILE_NAME")
+                echo $FILE_STAT
+        fi
+    done
+}
+
+#Run the code 
+function main() {
+    #RUN THE PROCESSUS
+    findFileAndStat $@
+    COMMAND=$@
+    $COMMAND
+    PID=$!
+    CMD_PID=$PID
+    while true; do
+        # Obtenez la date de dernière modification actuelle
+        NEWSTAT=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "./$FIND_FILE_NAME")
+        # Comparer les dates de modification
+        if [ "$NEWSTAT" == "$FILE_STAT" ]; then
+            echo "FILE WAS NOT CHANGED YET"
+        else
+            echo "\033[32mFILE HAS BEEN CHANGED\033[0m"
+            # UPDATE FILE STAT
+            # KILL THE PROCESSUS 
+            FILE_STAT="$NEWSTAT"
+            kill $PID
+            $COMMAND &
+            PID=$!
+            CMD_PID=$PID
+        fi
+        # Attendre 5 secondes avant la prochaine vérification
+        sleep 1
+    done
+    trap cleanup SIGINT 
+}
+
+ # Trap is set here
+function cleanup {
+    echo "Interruption détectée (Ctrl+C) ! Exécution du nettoyage avant l'arrêt..."
+    if [ -n "$CMD_PID" ]; then
+        kill $CMD_PID
+        echo "Processus $CMD_PID tué."
+    fi
+    echo "Nettoyage terminé. Arrêt du script."
+    exit 0
+}
+#call the function 
+main $@
+
